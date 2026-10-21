@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexora-backend
+    restart: always
+    environment:
+      - DATABASE_URL=sqlite:///./nexora.db
+      - JWT_SECRET=change_this_to_a_secure_random_string_in_production
+      - ENVIRONMENT=production
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend-data:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nexora-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  backend-data:

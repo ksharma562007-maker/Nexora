@@ -1,0 +1,38 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Nexora Smart Learning",
+      "url": "http://localhost:8080",
+      "runtimeArgs": [
+        "--app=http://localhost:8080"
+      ],
+      "webRoot": "${workspaceFolder}/frontend"
+    },
+    {
+      "name": "Python: FastAPI Backend",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "app.main:app",
+        "--reload",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "cwd": "${workspaceFolder}/backend",
+      "python": "${workspaceFolder}/backend/venv/Scripts/python.exe",
+      "jinja": true
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack (Backend + Nexora Smart Learning)",
+      "configurations": ["Python: FastAPI Backend", "Nexora Smart Learning"]
+    }
+  ]
+}
