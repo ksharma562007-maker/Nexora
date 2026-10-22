@@ -7,10 +7,12 @@ import {
 const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || '/api';
 
 // ==============================================================================
-// Local Database Engine for Offline & Vercel Static Deployments
+// Strict Multi-User Local Storage Engine for Offline & Vercel Deployments
+// Each user has strictly isolated subjects, notes, tasks, flashcards, exams.
+// New users start with 100% clean, empty records (no default fake data).
 // ==============================================================================
 class LocalStorageEngine {
-  private getStore(key: string, defaultVal: any = []) {
+  private getStore<T = any>(key: string, defaultVal: T = [] as any): T {
     try {
       const val = localStorage.getItem(`nexora_${key}`);
       return val ? JSON.parse(val) : defaultVal;
@@ -27,149 +29,12 @@ class LocalStorageEngine {
     }
   }
 
-  constructor() {
-    this.initSeedData();
-  }
-
-  private initSeedData() {
-    if (!localStorage.getItem('nexora_seeded')) {
-      const defaultUser: User = {
-        id: 1,
-        email: 'mayank2007@gmail.com',
-        username: 'mayank_0806',
-        full_name: 'Mayank Jangra',
-        avatar: 'avatar-1',
-        daily_goal_minutes: 120,
-        pomodoro_focus_min: 25,
-        pomodoro_break_min: 5,
-        theme_preference: 'dark',
-        created_at: new Date().toISOString()
-      };
-
-      const defaultSubjects: Subject[] = [
-        {
-          id: 1,
-          user_id: 1,
-          name: 'Computer Science & Data Structures',
-          code: 'CS101',
-          description: 'Fundamental algorithms, asymptotic analysis, and data representations.',
-          color: '#6366F1',
-          icon: 'Code',
-          target_hours: 25,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          topic_count: 4,
-          mastery_percentage: 68
-        },
-        {
-          id: 2,
-          user_id: 1,
-          name: 'Discrete Mathematics & Logic',
-          code: 'MATH201',
-          description: 'Propositional logic, combinatorics, proof methods, and graph theory.',
-          color: '#8B5CF6',
-          icon: 'Calculator',
-          target_hours: 20,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          topic_count: 3,
-          mastery_percentage: 54
-        },
-        {
-          id: 3,
-          user_id: 1,
-          name: 'AI & Machine Learning Foundations',
-          code: 'AI301',
-          description: 'Linear regression, neural networks, loss functions, and optimization.',
-          color: '#EC4899',
-          icon: 'Brain',
-          target_hours: 30,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          topic_count: 3,
-          mastery_percentage: 42
-        }
-      ];
-
-      const defaultTopics: Topic[] = [
-        { id: 1, subject_id: 1, title: 'Binary Search Trees & Balancing', description: 'AVL and Red-Black properties', priority: 'high', confidence_level: 4, mastery_score: 80, status: 'in_progress', created_at: new Date().toISOString() },
-        { id: 2, subject_id: 1, title: 'Dynamic Programming Memoization', description: 'Optimal substructure and overlapping subproblems', priority: 'urgent', confidence_level: 2, mastery_score: 45, status: 'in_progress', created_at: new Date().toISOString() },
-        { id: 3, subject_id: 2, title: 'Predicate Logic & Quantifiers', description: 'First-order logic formulations and proofs', priority: 'medium', confidence_level: 3, mastery_score: 60, status: 'in_progress', created_at: new Date().toISOString() },
-        { id: 4, subject_id: 3, title: 'Gradient Descent & Cost Functions', description: 'Stochastic vs Batch optimization algorithms', priority: 'high', confidence_level: 3, mastery_score: 50, status: 'in_progress', created_at: new Date().toISOString() }
-      ];
-
-      const defaultTasks: StudyTask[] = [
-        { id: 1, user_id: 1, subject_id: 1, topic_id: 2, title: 'Practice DP Knapsack Problems', priority: 'urgent', estimated_minutes: 45, status: 'pending', scheduled_date: new Date().toISOString().split('T')[0], is_recommended: true, reason_recommended: 'Upcoming midterms • Low mastery topic (45%)', created_at: new Date().toISOString() },
-        { id: 2, user_id: 1, subject_id: 2, topic_id: 3, title: 'Complete Predicate Logic Proofs', priority: 'high', estimated_minutes: 30, status: 'pending', scheduled_date: new Date().toISOString().split('T')[0], is_recommended: true, reason_recommended: 'Exam in 5 days', created_at: new Date().toISOString() },
-        { id: 3, user_id: 1, subject_id: 1, topic_id: 1, title: 'Review Tree Rotations Flashcards', priority: 'medium', estimated_minutes: 20, status: 'completed', scheduled_date: new Date().toISOString().split('T')[0], is_recommended: false, created_at: new Date().toISOString() }
-      ];
-
-      const defaultDecks: FlashcardDeck[] = [
-        { id: 1, user_id: 1, subject_id: 1, title: 'Core Data Structures Master Deck', description: 'Time complexities, operations, and space guarantees.', color: '#6366F1', card_count: 5, due_count: 3, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-        { id: 2, user_id: 1, subject_id: 3, title: 'Machine Learning Key Formulas', description: 'Loss functions, gradients, and activation functions.', color: '#EC4899', card_count: 4, due_count: 2, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
-      ];
-
-      const defaultCards: Flashcard[] = [
-        { id: 1, deck_id: 1, user_id: 1, front: 'What is the average and worst-case search complexity in an AVL Tree?', back: 'Average: O(log n)\nWorst-case: O(log n) because AVL trees guarantee strict height balancing with a factor ≤ 1.', hint: 'Both cases are logarithmic due to self-balancing.', repetition: 2, interval_days: 6, ease_factor: 2.5, next_review_date: new Date().toISOString(), created_at: new Date().toISOString() },
-        { id: 2, deck_id: 1, user_id: 1, front: 'What are the two key properties required for Dynamic Programming?', back: '1. Optimal Substructure (an optimal solution contains optimal sub-solutions)\n2. Overlapping Subproblems (subproblems recur frequently and can be cached).', hint: 'Substructure and caching.', repetition: 1, interval_days: 1, ease_factor: 2.5, next_review_date: new Date().toISOString(), created_at: new Date().toISOString() },
-        { id: 3, deck_id: 2, user_id: 1, front: 'What is the vanishing gradient problem in deep neural networks?', back: 'During backpropagation, gradients shrink exponentially as they propagate backward through many layers with saturating activations (like Sigmoid), preventing weights in early layers from updating.', hint: 'Sigmoid derivatives are < 0.25.', repetition: 1, interval_days: 1, ease_factor: 2.4, next_review_date: new Date().toISOString(), created_at: new Date().toISOString() }
-      ];
-
-      const defaultQuizzes: Quiz[] = [
-        {
-          id: 1,
-          user_id: 1,
-          subject_id: 1,
-          title: 'Algorithms Midterm Assessment',
-          description: 'Covers Big-O notations, tree traversals, and dynamic programming.',
-          time_limit_minutes: 20,
-          pass_percentage: 70,
-          total_questions: 3,
-          created_at: new Date().toISOString(),
-          questions: [
-            { id: 1, quiz_id: 1, question_text: 'Which sorting algorithm has a guaranteed O(n log n) worst-case time complexity?', question_type: 'multiple_choice', options: ['QuickSort', 'MergeSort', 'BubbleSort', 'SelectionSort'], correct_answer: 'MergeSort', explanation: 'MergeSort always divides the array evenly and merges in linear time, guaranteeing O(n log n).' },
-            { id: 2, quiz_id: 1, question_text: 'Dynamic Programming requires overlapping subproblems and optimal substructure.', question_type: 'true_false', options: ['True', 'False'], correct_answer: 'True', explanation: 'Both properties are the mathematical foundation of dynamic programming.' },
-            { id: 3, quiz_id: 1, question_text: 'What data structure is used to implement Breadth-First Search (BFS)?', question_type: 'multiple_choice', options: ['Stack', 'Queue', 'Heap', 'Tree'], correct_answer: 'Queue', explanation: 'BFS explores nodes level by level using a FIFO Queue.' }
-          ]
-        }
-      ];
-
-      const defaultNotes: Note[] = [
-        {
-          id: 1,
-          user_id: 1,
-          subject_id: 1,
-          title: 'Lecture Note: Asymptotic Analysis & Recurrences',
-          content: '# Asymptotic Analysis\n\nBig-O represents an upper bound on the growth rate of a function.\n\n### Master Theorem\nUsed to solve divide-and-conquer recurrences: T(n) = aT(n/b) + f(n).\n- If f(n) = O(n^(log_b a - epsilon)), then T(n) = Theta(n^log_b a).\n- If f(n) = Theta(n^log_b a), then T(n) = Theta(n^log_b a * log n).\n\n### Space vs Time Tradeoff\nHash tables trade extra space for O(1) expected lookup time.',
-          tags: 'algorithms, master-theorem, big-o',
-          is_pinned: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ];
-
-      const defaultExams: Exam[] = [
-        { id: 1, user_id: 1, subject_id: 1, title: 'Algorithms & Data Structures Midterm', exam_date: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0], target_score: 90, weight_percentage: 30, notes: 'Focus on DP knapsack and graph BFS/DFS proofs', created_at: new Date().toISOString() },
-        { id: 2, user_id: 1, subject_id: 2, title: 'Discrete Math Final Examination', exam_date: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0], target_score: 85, weight_percentage: 40, notes: 'Predicate proofs and recurrence relations', created_at: new Date().toISOString() }
-      ];
-
-      const defaultGoals: Goal[] = [
-        { id: 1, user_id: 1, title: 'Complete 10 Hours of Deep Study This Week', goal_type: 'study_hours', target_value: 600, current_value: 360, deadline: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0], is_completed: false, created_at: new Date().toISOString() },
-        { id: 2, user_id: 1, title: 'Review 50 Spaced Repetition Cards', goal_type: 'cards_reviewed', target_value: 50, current_value: 35, is_completed: false, created_at: new Date().toISOString() }
-      ];
-
-      this.setStore('users', [defaultUser]);
-      this.setStore('subjects', defaultSubjects);
-      this.setStore('topics', defaultTopics);
-      this.setStore('tasks', defaultTasks);
-      this.setStore('decks', defaultDecks);
-      this.setStore('cards', defaultCards);
-      this.setStore('quizzes', defaultQuizzes);
-      this.setStore('notes', defaultNotes);
-      this.setStore('exams', defaultExams);
-      this.setStore('goals', defaultGoals);
-      this.setStore('sessions', []);
-      localStorage.setItem('nexora_seeded', 'true');
+  private getCurrentUser(): User | null {
+    try {
+      const u = localStorage.getItem('nexora_current_user');
+      return u ? JSON.parse(u) : null;
+    } catch {
+      return null;
     }
   }
 
@@ -184,19 +49,26 @@ class LocalStorageEngine {
       }
     }
 
+    const currentUser = this.getCurrentUser();
+    const currentUserId = currentUser ? currentUser.id : 1;
+
     // --- Auth Endpoints ---
     if (endpoint === '/auth/register' && method === 'POST') {
-      const users = this.getStore('users');
+      const users = this.getStore<any[]>('users', []);
       const email = (body.email || '').toLowerCase().trim();
-      const existing = users.find((u: User) => u.email === email);
+      const username = (body.username || email.split('@')[0]).trim();
+      const password = body.password || '';
+
+      const existing = users.find(u => u.email === email || u.username === username);
       if (existing) {
-        return { access_token: `token_${existing.id}`, token_type: 'bearer', user: existing };
+        throw new Error('A user with this email or username already exists.');
       }
+
       const newUser: User = {
-        id: users.length + 1,
+        id: Date.now(),
         email,
-        username: body.username || email.split('@')[0],
-        full_name: body.full_name || 'Student Learner',
+        username,
+        full_name: body.full_name?.trim() || username,
         avatar: 'avatar-1',
         daily_goal_minutes: 120,
         pomodoro_focus_min: 25,
@@ -204,243 +76,399 @@ class LocalStorageEngine {
         theme_preference: 'dark',
         created_at: new Date().toISOString()
       };
-      users.push(newUser);
+
+      // Store user with credentials
+      users.push({ ...newUser, password });
       this.setStore('users', users);
       localStorage.setItem('nexora_current_user', JSON.stringify(newUser));
-      return { access_token: `token_${newUser.id}`, token_type: 'bearer', user: newUser };
+
+      return {
+        access_token: `token_${newUser.id}`,
+        token_type: 'bearer',
+        user: newUser
+      };
     }
 
     if (endpoint === '/auth/login' && method === 'POST') {
-      const users = this.getStore('users');
+      const users = this.getStore<any[]>('users', []);
       const identifier = (body.email || '').toLowerCase().trim();
-      let user = users.find((u: User) => u.email.toLowerCase() === identifier || u.username.toLowerCase() === identifier);
-      if (!user) {
-        user = {
-          id: users.length + 1,
-          email: identifier.includes('@') ? identifier : `${identifier}@nexora.io`,
-          username: identifier.replace(/[@.]/g, '_'),
-          full_name: identifier.split('@')[0],
-          avatar: 'avatar-1',
-          daily_goal_minutes: 120,
-          pomodoro_focus_min: 25,
-          pomodoro_break_min: 5,
-          theme_preference: 'dark',
-          created_at: new Date().toISOString()
-        };
-        users.push(user);
-        this.setStore('users', users);
-      }
-      localStorage.setItem('nexora_current_user', JSON.stringify(user));
-      return { access_token: `token_${user.id}`, token_type: 'bearer', user };
-    }
+      const password = body.password || '';
 
-    if (endpoint === '/auth/me') {
-      const current = localStorage.getItem('nexora_current_user');
-      if (current) {
-        return JSON.parse(current);
+      const userRecord = users.find(
+        u => u.email?.toLowerCase() === identifier || u.username?.toLowerCase() === identifier
+      );
+
+      if (!userRecord) {
+        throw new Error('Invalid credentials. User not found. Please register.');
       }
-      const users = this.getStore('users');
-      return users[0] || {
-        id: 1,
-        email: 'student@nexora.io',
-        username: 'student',
-        full_name: 'Student Learner',
-        avatar: 'avatar-1',
-        daily_goal_minutes: 120,
-        pomodoro_focus_min: 25,
-        pomodoro_break_min: 5,
-        theme_preference: 'dark',
-        created_at: new Date().toISOString()
+
+      if (userRecord.password && password && userRecord.password !== password) {
+        throw new Error('Invalid credentials. Incorrect password.');
+      }
+
+      const userOut: User = {
+        id: userRecord.id,
+        email: userRecord.email,
+        username: userRecord.username,
+        full_name: userRecord.full_name,
+        avatar: userRecord.avatar || 'avatar-1',
+        daily_goal_minutes: userRecord.daily_goal_minutes || 120,
+        pomodoro_focus_min: userRecord.pomodoro_focus_min || 25,
+        pomodoro_break_min: userRecord.pomodoro_break_min || 5,
+        theme_preference: userRecord.theme_preference || 'dark',
+        created_at: userRecord.created_at || new Date().toISOString()
+      };
+
+      localStorage.setItem('nexora_current_user', JSON.stringify(userOut));
+      return {
+        access_token: `token_${userOut.id}`,
+        token_type: 'bearer',
+        user: userOut
       };
     }
 
-    if (endpoint === '/auth/profile' && method === 'PUT') {
-      const users = this.getStore('users');
-      if (users[0]) {
-        Object.assign(users[0], body);
-        this.setStore('users', users);
+    if (endpoint === '/auth/me') {
+      if (currentUser) {
+        return currentUser;
+      }
+      const users = this.getStore<User[]>('users', []);
+      if (users.length > 0) {
         localStorage.setItem('nexora_current_user', JSON.stringify(users[0]));
         return users[0];
+      }
+      throw new Error('No user signed in');
+    }
+
+    if (endpoint === '/auth/profile' && method === 'PUT') {
+      const users = this.getStore<any[]>('users', []);
+      const idx = users.findIndex(u => u.id === currentUserId);
+      if (idx !== -1) {
+        Object.assign(users[idx], body);
+        this.setStore('users', users);
+        localStorage.setItem('nexora_current_user', JSON.stringify(users[idx]));
+        return users[idx];
       }
       return body;
     }
 
-    // --- Subjects & Topics ---
+    // --- Subjects & Topics (Filtered strictly by user_id) ---
     if (endpoint === '/subjects' && method === 'GET') {
-      return this.getStore('subjects');
+      const subjects = this.getStore<Subject[]>('subjects', []);
+      return subjects.filter(s => s.user_id === currentUserId);
     }
     if (endpoint === '/subjects' && method === 'POST') {
-      const items = this.getStore('subjects');
-      const newItem = { id: Date.now(), user_id: 1, ...body, created_at: new Date().toISOString(), topic_count: 0, mastery_percentage: 0 };
-      items.push(newItem);
-      this.setStore('subjects', items);
-      return newItem;
+      const subjects = this.getStore<Subject[]>('subjects', []);
+      const newSubject: Subject = {
+        id: Date.now(),
+        user_id: currentUserId,
+        name: body.name || 'Untitled Subject',
+        code: body.code || '',
+        description: body.description || '',
+        color: body.color || '#6366F1',
+        icon: body.icon || 'BookOpen',
+        target_hours: body.target_hours || 20,
+        topic_count: 0,
+        mastery_percentage: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      subjects.push(newSubject);
+      this.setStore('subjects', subjects);
+      return newSubject;
     }
     if (endpoint.startsWith('/subjects/') && !endpoint.includes('topics') && method === 'GET') {
       const id = parseInt(endpoint.split('/')[2]);
-      const subjects = this.getStore('subjects');
-      const subject = subjects.find((s: any) => s.id === id) || subjects[0];
-      const topics = this.getStore('topics').filter((t: any) => t.subject_id === id);
+      const subjects = this.getStore<Subject[]>('subjects', []).filter(s => s.user_id === currentUserId);
+      const subject = subjects.find(s => s.id === id);
+      if (!subject) throw new Error('Subject not found');
+      const topics = this.getStore<Topic[]>('topics', []).filter(t => t.subject_id === id);
       return { ...subject, topics };
     }
     if (endpoint.startsWith('/subjects/') && !endpoint.includes('topics') && method === 'PUT') {
       const id = parseInt(endpoint.split('/')[2]);
-      const subjects = this.getStore('subjects');
-      const index = subjects.findIndex((s: any) => s.id === id);
-      if (index !== -1) {
-        Object.assign(subjects[index], body);
+      const subjects = this.getStore<Subject[]>('subjects', []);
+      const idx = subjects.findIndex(s => s.id === id && s.user_id === currentUserId);
+      if (idx !== -1) {
+        Object.assign(subjects[idx], body, { updated_at: new Date().toISOString() });
         this.setStore('subjects', subjects);
-        return subjects[index];
+        return subjects[idx];
       }
-      return body;
+      throw new Error('Subject not found');
     }
     if (endpoint.startsWith('/subjects/') && !endpoint.includes('topics') && method === 'DELETE') {
       const id = parseInt(endpoint.split('/')[2]);
-      const subjects = this.getStore('subjects').filter((s: any) => s.id !== id);
+      const subjects = this.getStore<Subject[]>('subjects', []).filter(s => !(s.id === id && s.user_id === currentUserId));
       this.setStore('subjects', subjects);
       return { message: 'Subject deleted successfully' };
     }
 
+    // --- Topics ---
     if (endpoint === '/subjects/topics' && method === 'POST') {
-      const topics = this.getStore('topics');
-      const newTopic = { id: Date.now(), ...body, created_at: new Date().toISOString() };
+      const topics = this.getStore<Topic[]>('topics', []);
+      const newTopic: Topic = {
+        id: Date.now(),
+        subject_id: body.subject_id,
+        title: body.title || 'New Topic',
+        description: body.description || '',
+        priority: body.priority || 'medium',
+        confidence_level: body.confidence_level || 2,
+        mastery_score: body.mastery_score || 0,
+        status: body.status || 'not_started',
+        created_at: new Date().toISOString()
+      };
       topics.push(newTopic);
       this.setStore('topics', topics);
+
+      // Increment subject topic_count
+      const subjects = this.getStore<Subject[]>('subjects', []);
+      const s = subjects.find(sub => sub.id === body.subject_id && sub.user_id === currentUserId);
+      if (s) {
+        s.topic_count = (s.topic_count || 0) + 1;
+        this.setStore('subjects', subjects);
+      }
       return newTopic;
     }
     if (endpoint.startsWith('/subjects/topics/') && method === 'PUT') {
       const id = parseInt(endpoint.split('/').pop() || '0');
-      const topics = this.getStore('topics');
-      const idx = topics.findIndex((t: any) => t.id === id);
+      const topics = this.getStore<Topic[]>('topics', []);
+      const idx = topics.findIndex(t => t.id === id);
       if (idx !== -1) {
         Object.assign(topics[idx], body);
         this.setStore('topics', topics);
         return topics[idx];
       }
-      return body;
+      throw new Error('Topic not found');
     }
     if (endpoint.startsWith('/subjects/topics/') && method === 'DELETE') {
       const id = parseInt(endpoint.split('/').pop() || '0');
-      const topics = this.getStore('topics').filter((t: any) => t.id !== id);
+      const topics = this.getStore<Topic[]>('topics', []).filter(t => t.id !== id);
       this.setStore('topics', topics);
-      return { message: 'Topic deleted' };
+      return { message: 'Topic deleted successfully' };
     }
 
-    // --- Planner ---
+    // --- Planner Tasks (Filtered strictly by user_id) ---
     if (endpoint.startsWith('/planner/tasks') && method === 'GET') {
-      return this.getStore('tasks');
+      const tasks = this.getStore<StudyTask[]>('tasks', []).filter(t => t.user_id === currentUserId);
+      return tasks;
     }
     if (endpoint === '/planner/tasks' && method === 'POST') {
-      const tasks = this.getStore('tasks');
-      const newTask = { id: Date.now(), user_id: 1, ...body, created_at: new Date().toISOString() };
+      const tasks = this.getStore<StudyTask[]>('tasks', []);
+      const newTask: StudyTask = {
+        id: Date.now(),
+        user_id: currentUserId,
+        subject_id: body.subject_id || null,
+        topic_id: body.topic_id || null,
+        title: body.title || 'Untitled Task',
+        priority: body.priority || 'medium',
+        estimated_minutes: body.estimated_minutes || 30,
+        status: body.status || 'pending',
+        scheduled_date: body.scheduled_date || new Date().toISOString().split('T')[0],
+        is_recommended: false,
+        created_at: new Date().toISOString()
+      };
       tasks.push(newTask);
       this.setStore('tasks', tasks);
       return newTask;
     }
     if (endpoint.startsWith('/planner/tasks/') && method === 'PUT') {
       const id = parseInt(endpoint.split('/').pop() || '0');
-      const tasks = this.getStore('tasks');
-      const idx = tasks.findIndex((t: any) => t.id === id);
+      const tasks = this.getStore<StudyTask[]>('tasks', []);
+      const idx = tasks.findIndex(t => t.id === id && t.user_id === currentUserId);
       if (idx !== -1) {
         Object.assign(tasks[idx], body);
         this.setStore('tasks', tasks);
         return tasks[idx];
       }
-      return body;
+      throw new Error('Task not found');
     }
     if (endpoint.startsWith('/planner/tasks/') && method === 'DELETE') {
       const id = parseInt(endpoint.split('/').pop() || '0');
-      const tasks = this.getStore('tasks').filter((t: any) => t.id !== id);
+      const tasks = this.getStore<StudyTask[]>('tasks', []).filter(t => !(t.id === id && t.user_id === currentUserId));
       this.setStore('tasks', tasks);
       return { message: 'Task deleted' };
     }
     if (endpoint === '/planner/recommendations') {
-      const tasks = this.getStore('tasks');
+      const tasks = this.getStore<StudyTask[]>('tasks', []).filter(t => t.user_id === currentUserId && t.status !== 'completed');
       return {
-        recommended_tasks: tasks.slice(0, 3).map((t: StudyTask) => ({
+        recommended_tasks: tasks.slice(0, 3).map(t => ({
           task: t,
-          priority_score: 85,
-          reasons: ['Approaching deadline', 'High curriculum importance'],
-          explanation: `Recommended focus based on study schedule and high priority.`
+          priority_score: 80,
+          reasons: ['Scheduled task'],
+          explanation: `Recommended focus for ${t.title}.`
         })),
         conflicts: [],
-        daily_load: { [new Date().toISOString().split('T')[0]]: 65 },
+        daily_load: {},
         daily_capacity_minutes: 120
       };
     }
 
-    // --- Focus Timer ---
+    // --- Focus Timer (Filtered strictly by user_id) ---
     if (endpoint === '/timer/sessions' && method === 'POST') {
-      const sessions = this.getStore('sessions');
-      const newSession = { id: Date.now(), user_id: 1, ...body, created_at: new Date().toISOString() };
+      const sessions = this.getStore<any[]>('sessions', []);
+      const newSession = {
+        id: Date.now(),
+        user_id: currentUserId,
+        ...body,
+        created_at: new Date().toISOString()
+      };
       sessions.push(newSession);
       this.setStore('sessions', sessions);
       return newSession;
     }
     if (endpoint === '/timer/stats') {
-      const sessions = this.getStore('sessions');
-      const totalSec = sessions.reduce((acc: number, s: any) => acc + (s.duration_seconds || 0), 1800);
+      const sessions = this.getStore<any[]>('sessions', []).filter(s => s.user_id === currentUserId);
+      const totalSec = sessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
       return {
         today_minutes: Math.round(totalSec / 60),
         weekly_minutes: Math.round(totalSec / 60),
         total_hours: +(totalSec / 3600).toFixed(1),
-        total_sessions: Math.max(sessions.length, 2),
+        total_sessions: sessions.length,
         recent_sessions: sessions.slice(-5),
-        daily_goal_minutes: 120,
-        pomodoro_focus_min: 25,
-        pomodoro_break_min: 5
+        daily_goal_minutes: currentUser?.daily_goal_minutes || 120,
+        pomodoro_focus_min: currentUser?.pomodoro_focus_min || 25,
+        pomodoro_break_min: currentUser?.pomodoro_break_min || 5
       };
     }
 
-    // --- Quizzes ---
+    // --- Quizzes (Filtered strictly by user_id) ---
     if (endpoint === '/quizzes' && method === 'GET') {
-      return this.getStore('quizzes');
+      return this.getStore<Quiz[]>('quizzes', []).filter(q => q.user_id === currentUserId);
+    }
+    if (endpoint === '/quizzes' && method === 'POST') {
+      const quizzes = this.getStore<Quiz[]>('quizzes', []);
+      const newQuiz: Quiz = {
+        id: Date.now(),
+        user_id: currentUserId,
+        subject_id: body.subject_id || null,
+        topic_id: body.topic_id || null,
+        title: body.title || 'Untitled Quiz',
+        description: body.description || '',
+        time_limit_minutes: body.time_limit_minutes || 15,
+        passing_score: body.passing_score || 70,
+        question_count: body.questions?.length || 0,
+        created_at: new Date().toISOString(),
+        questions: body.questions || []
+      };
+      quizzes.push(newQuiz);
+      this.setStore('quizzes', quizzes);
+      return newQuiz;
     }
     if (endpoint.startsWith('/quizzes/') && !endpoint.includes('submit') && !endpoint.includes('attempts') && method === 'GET') {
       const id = parseInt(endpoint.split('/')[2]);
-      const quizzes = this.getStore('quizzes');
-      return quizzes.find((q: any) => q.id === id) || quizzes[0];
+      const quizzes = this.getStore<Quiz[]>('quizzes', []).filter(q => q.user_id === currentUserId);
+      const quiz = quizzes.find(q => q.id === id);
+      if (!quiz) throw new Error('Quiz not found');
+      return quiz;
     }
     if (endpoint.includes('/submit') && method === 'POST') {
+      const id = parseInt(endpoint.split('/')[2]);
+      const quizzes = this.getStore<Quiz[]>('quizzes', []).filter(q => q.user_id === currentUserId);
+      const quiz = quizzes.find(q => q.id === id);
+      const questions = quiz?.questions || [];
+      const answers = body.answers || {};
+
+      let score = 0;
+      const details = questions.map((q, idx) => {
+        const userAns = answers[q.id] || answers[idx] || '';
+        const isCorrect = userAns.toLowerCase().trim() === q.correct_answer.toLowerCase().trim();
+        if (isCorrect) score += 1;
+        return {
+          question_id: q.id,
+          question_text: q.question_text,
+          user_answer: userAns,
+          correct_answer: q.correct_answer,
+          is_correct: isCorrect,
+          explanation: q.explanation || ''
+        };
+      });
+
+      const total = questions.length || 1;
+      const pct = Math.round((score / total) * 100);
       return {
         id: Date.now(),
-        quiz_id: 1,
-        user_id: 1,
-        score: 3,
-        total_questions: 3,
-        percentage: 100,
-        passed: true,
+        quiz_id: id,
+        user_id: currentUserId,
+        score,
+        max_score: total,
+        percentage: pct,
+        passed: pct >= (quiz?.passing_score || 70),
         completed_at: new Date().toISOString(),
-        details: [
-          { question_id: 1, user_answer: 'MergeSort', correct_answer: 'MergeSort', is_correct: true, explanation: 'MergeSort guarantees O(n log n).' },
-          { question_id: 2, user_answer: 'True', correct_answer: 'True', is_correct: true, explanation: 'Correct.' },
-          { question_id: 3, user_answer: 'Queue', correct_answer: 'Queue', is_correct: true, explanation: 'BFS uses a FIFO queue.' }
-        ]
+        results: details,
+        weak_topics: []
       };
     }
     if (endpoint.includes('/attempts')) {
       return [];
     }
 
-    // --- Flashcards ---
+    // --- Flashcards (Filtered strictly by user_id) ---
     if (endpoint === '/flashcards/decks' && method === 'GET') {
-      return this.getStore('decks');
+      return this.getStore<FlashcardDeck[]>('decks', []).filter(d => d.user_id === currentUserId);
+    }
+    if (endpoint === '/flashcards/decks' && method === 'POST') {
+      const decks = this.getStore<FlashcardDeck[]>('decks', []);
+      const newDeck: FlashcardDeck = {
+        id: Date.now(),
+        user_id: currentUserId,
+        subject_id: body.subject_id || null,
+        topic_id: body.topic_id || null,
+        title: body.title || 'Untitled Deck',
+        description: body.description || '',
+        color: body.color || '#6366F1',
+        total_cards: 0,
+        due_cards: 0,
+        new_cards: 0,
+        created_at: new Date().toISOString()
+      };
+      decks.push(newDeck);
+      this.setStore('decks', decks);
+      return newDeck;
     }
     if (endpoint.startsWith('/flashcards/decks/') && endpoint.endsWith('/cards')) {
-      return this.getStore('cards');
+      const deckId = parseInt(endpoint.split('/')[3]);
+      return this.getStore<Flashcard[]>('cards', []).filter(c => c.deck_id === deckId && c.user_id === currentUserId);
     }
     if (endpoint.startsWith('/flashcards/decks/') && method === 'GET') {
-      const id = parseInt(endpoint.split('/')[3]);
-      const decks = this.getStore('decks');
-      return decks.find((d: any) => d.id === id) || decks[0];
+      const deckId = parseInt(endpoint.split('/')[3]);
+      const deck = this.getStore<FlashcardDeck[]>('decks', []).find(d => d.id === deckId && d.user_id === currentUserId);
+      if (!deck) throw new Error('Deck not found');
+      return deck;
     }
     if (endpoint.startsWith('/flashcards/due')) {
-      return this.getStore('cards');
+      return this.getStore<Flashcard[]>('cards', []).filter(c => c.user_id === currentUserId);
+    }
+    if (endpoint === '/flashcards/cards' && method === 'POST') {
+      const cards = this.getStore<Flashcard[]>('cards', []);
+      const newCard: Flashcard = {
+        id: Date.now(),
+        deck_id: body.deck_id,
+        user_id: currentUserId,
+        front: body.front || '',
+        back: body.back || '',
+        hint: body.hint || '',
+        repetition: 0,
+        interval_days: 1,
+        ease_factor: 2.5,
+        next_review_date: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      };
+      cards.push(newCard);
+      this.setStore('cards', cards);
+
+      // Increment deck total_cards
+      const decks = this.getStore<FlashcardDeck[]>('decks', []);
+      const d = decks.find(deck => deck.id === body.deck_id && deck.user_id === currentUserId);
+      if (d) {
+        d.total_cards = (d.total_cards || 0) + 1;
+        d.due_cards = (d.due_cards || 0) + 1;
+        this.setStore('decks', decks);
+      }
+      return newCard;
     }
     if (endpoint.includes('/review') && method === 'POST') {
-      const cards = this.getStore('cards');
       const cardId = parseInt(endpoint.split('/')[3]);
-      const card = cards.find((c: any) => c.id === cardId) || cards[0];
+      const cards = this.getStore<Flashcard[]>('cards', []);
+      const card = cards.find(c => c.id === cardId && c.user_id === currentUserId);
       if (card) {
         card.repetition = (card.repetition || 0) + 1;
         card.interval_days = Math.round((card.interval_days || 1) * (card.ease_factor || 2.5));
@@ -450,101 +478,160 @@ class LocalStorageEngine {
       return { message: 'Reviewed' };
     }
 
-    // --- Notes & PDF ---
+    // --- Notes & PDF Assistant (Filtered strictly by user_id) ---
     if (endpoint.startsWith('/notes') && method === 'GET') {
-      return this.getStore('notes');
+      return this.getStore<Note[]>('notes', []).filter(n => n.user_id === currentUserId);
     }
     if (endpoint === '/notes' && method === 'POST') {
-      const notes = this.getStore('notes');
-      const newNote = { id: Date.now(), user_id: 1, ...body, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      const notes = this.getStore<Note[]>('notes', []);
+      const newNote: Note = {
+        id: Date.now(),
+        user_id: currentUserId,
+        subject_id: body.subject_id || null,
+        title: body.title || 'Untitled Note',
+        content: body.content || '',
+        tags: body.tags || '',
+        is_pinned: body.is_pinned || false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
       notes.push(newNote);
       this.setStore('notes', notes);
       return newNote;
     }
+    if (endpoint.startsWith('/notes/') && !endpoint.includes('summarize') && !endpoint.includes('ask') && method === 'GET') {
+      const id = parseInt(endpoint.split('/')[2]);
+      const note = this.getStore<Note[]>('notes', []).find(n => n.id === id && n.user_id === currentUserId);
+      if (!note) throw new Error('Note not found');
+      return note;
+    }
+    if (endpoint.startsWith('/notes/') && method === 'DELETE') {
+      const id = parseInt(endpoint.split('/')[2]);
+      const notes = this.getStore<Note[]>('notes', []).filter(n => !(n.id === id && n.user_id === currentUserId));
+      this.setStore('notes', notes);
+      return { message: 'Note deleted' };
+    }
     if (endpoint.startsWith('/notes/') && endpoint.includes('/summarize') && method === 'POST') {
       return {
-        summary: 'Big-O represents the upper bound on growth rate. Master Theorem solves divide-and-conquer recurrences. Hash tables trade space for constant-time lookups.',
-        key_points: [
-          'Big-O formalizes worst-case algorithmic runtime.',
-          'Master Theorem provides a closed-form formula for recurrences.',
-          'Space-time tradeoff allows caching to optimize execution speed.'
-        ],
-        word_count: 85,
+        summary: 'Extractive summary of your note.',
+        key_points: ['Summary extracted from note text.'],
+        word_count: 40,
         estimated_read_minutes: 1
       };
     }
     if (endpoint.startsWith('/notes/') && endpoint.includes('/ask') && method === 'POST') {
       return {
-        answer: 'According to your notes, the Master Theorem is used to solve divide-and-conquer recurrences of the form T(n) = aT(n/b) + f(n).',
-        cited_snippets: ['Master Theorem: Used to solve divide-and-conquer recurrences: T(n) = aT(n/b) + f(n).'],
-        confidence: 0.94
+        answer: 'Extracted response from your study document.',
+        cited_snippets: ['Cited excerpt from note.'],
+        confidence: 0.95
       };
     }
 
-    // --- Exams & Goals ---
+    // --- Exams & Goals (Filtered strictly by user_id) ---
     if (endpoint === '/exams' && method === 'GET') {
-      return this.getStore('exams');
+      return this.getStore<Exam[]>('exams', []).filter(e => e.user_id === currentUserId);
     }
     if (endpoint === '/exams' && method === 'POST') {
-      const items = this.getStore('exams');
-      const newItem = { id: Date.now(), user_id: 1, ...body, created_at: new Date().toISOString() };
-      items.push(newItem);
-      this.setStore('exams', items);
-      return newItem;
+      const exams = this.getStore<Exam[]>('exams', []);
+      const newExam: Exam = {
+        id: Date.now(),
+        user_id: currentUserId,
+        subject_id: body.subject_id || null,
+        title: body.title || 'Untitled Exam',
+        exam_date: body.exam_date || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+        target_score: body.target_score || 85,
+        weight_percentage: body.weight_percentage || 20,
+        notes: body.notes || '',
+        days_remaining: 7,
+        created_at: new Date().toISOString()
+      };
+      exams.push(newExam);
+      this.setStore('exams', exams);
+      return newExam;
     }
-    if (endpoint === '/goals' && method === 'GET') {
-      return this.getStore('goals');
-    }
-    if (endpoint === '/goals' && method === 'POST') {
-      const items = this.getStore('goals');
-      const newItem = { id: Date.now(), user_id: 1, ...body, created_at: new Date().toISOString() };
-      items.push(newItem);
-      this.setStore('goals', items);
-      return newItem;
+    if (endpoint.startsWith('/exams/') && method === 'DELETE') {
+      const id = parseInt(endpoint.split('/').pop() || '0');
+      const exams = this.getStore<Exam[]>('exams', []).filter(e => !(e.id === id && e.user_id === currentUserId));
+      this.setStore('exams', exams);
+      return { message: 'Exam deleted' };
     }
 
-    // --- Analytics Dashboard ---
+    if (endpoint === '/goals' && method === 'GET') {
+      return this.getStore<Goal[]>('goals', []).filter(g => g.user_id === currentUserId);
+    }
+    if (endpoint === '/goals' && method === 'POST') {
+      const goals = this.getStore<Goal[]>('goals', []);
+      const newGoal: Goal = {
+        id: Date.now(),
+        user_id: currentUserId,
+        title: body.title || 'Untitled Goal',
+        category: body.category || 'study_hours',
+        target_value: body.target_value || 100,
+        current_value: 0,
+        unit: body.unit || 'minutes',
+        deadline: body.deadline || null,
+        is_completed: false,
+        progress_percentage: 0
+      };
+      goals.push(newGoal);
+      this.setStore('goals', goals);
+      return newGoal;
+    }
+    if (endpoint.startsWith('/goals/') && method === 'DELETE') {
+      const id = parseInt(endpoint.split('/').pop() || '0');
+      const goals = this.getStore<Goal[]>('goals', []).filter(g => !(g.id === id && g.user_id === currentUserId));
+      this.setStore('goals', goals);
+      return { message: 'Goal deleted' };
+    }
+
+    // --- Dashboard Telemetry (Strictly Per-User) ---
     if (endpoint === '/analytics/dashboard') {
-      const subjects = this.getStore('subjects');
-      const cards = this.getStore('cards');
-      const exams = this.getStore('exams');
+      const subjects = this.getStore<Subject[]>('subjects', []).filter(s => s.user_id === currentUserId);
+      const tasks = this.getStore<StudyTask[]>('tasks', []).filter(t => t.user_id === currentUserId);
+      const cards = this.getStore<Flashcard[]>('cards', []).filter(c => c.user_id === currentUserId);
+      const exams = this.getStore<Exam[]>('exams', []).filter(e => e.user_id === currentUserId);
+      const sessions = this.getStore<any[]>('sessions', []).filter(s => s.user_id === currentUserId);
+
+      // Check if this specific user has ANY activity or added items
+      const hasActivity = subjects.length > 0 || tasks.length > 0 || sessions.length > 0 || cards.length > 0 || exams.length > 0;
+
+      const totalSec = sessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
+      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const weeklyFocus = dayNames.map((day, idx) => ({
+        day,
+        date: `Day ${idx + 1}`,
+        minutes: 0
+      }));
+
       return {
-        user: this.handleRequest('/auth/me'),
-        stats: {
-          streak_days: 4,
-          due_flashcards: cards.length,
-          upcoming_exams: exams.length,
-          weekly_study_minutes: 180,
-          overall_mastery_percentage: 65,
-          active_subjects_count: subjects.length
-        },
-        weekly_study_trend: [
-          { day: 'Mon', minutes: 35 },
-          { day: 'Tue', minutes: 50 },
-          { day: 'Wed', minutes: 40 },
-          { day: 'Thu', minutes: 55 },
-          { day: 'Fri', minutes: 30 },
-          { day: 'Sat', minutes: 60 },
-          { day: 'Sun', minutes: 45 }
-        ],
-        weak_topics: [
-          { id: 2, title: 'Dynamic Programming Memoization', subject_name: 'Computer Science', mastery: 45 }
-        ]
+        user_name: currentUser?.full_name || 'Learner',
+        today_focus_minutes: Math.round(totalSec / 60),
+        daily_goal_minutes: currentUser?.daily_goal_minutes || 120,
+        active_streak_days: hasActivity ? 1 : 0,
+        total_study_hours: +(totalSec / 3600).toFixed(1),
+        pending_tasks_count: tasks.filter(t => t.status !== 'completed').length,
+        due_flashcards_count: cards.length,
+        upcoming_exams_count: exams.length,
+        mastery_average: subjects.length > 0 ? Math.round(subjects.reduce((a, s) => a + (s.mastery_percentage || 0), 0) / subjects.length) : 0,
+        weekly_focus: weeklyFocus,
+        subject_mastery: subjects.map(s => ({
+          id: s.id,
+          name: s.name,
+          color: s.color,
+          mastery_percentage: s.mastery_percentage || 0,
+          topics_count: s.topic_count || 0,
+          study_minutes: 0
+        })),
+        weak_topics: [],
+        recommendations: [],
+        has_activity: hasActivity
       };
     }
 
     if (endpoint === '/analytics/deep') {
       return {
-        accuracy_history: [
-          { quiz: 'Quiz 1', accuracy: 75 },
-          { quiz: 'Quiz 2', accuracy: 88 },
-          { quiz: 'Quiz 3', accuracy: 92 }
-        ],
-        time_allocation: [
-          { subject: 'Computer Science', hours: 6.5 },
-          { subject: 'Discrete Math', hours: 4.2 },
-          { subject: 'Machine Learning', hours: 3.8 }
-        ]
+        accuracy_history: [],
+        time_allocation: []
       };
     }
 
