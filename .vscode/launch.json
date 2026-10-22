@@ -2,14 +2,17 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Nexora Smart Learning",
       "type": "chrome",
       "request": "launch",
-      "name": "Nexora Smart Learning",
       "url": "http://localhost:8080",
-      "preLaunchTask": "Start Both Services",
-      "runtimeArgs": [
-        "--app=http://localhost:8080"
-      ],
+      "webRoot": "${workspaceFolder}/frontend"
+    },
+    {
+      "name": "Nexora (Microsoft Edge)",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://localhost:8080",
       "webRoot": "${workspaceFolder}/frontend"
     },
     {
@@ -26,8 +29,7 @@
         "8000"
       ],
       "cwd": "${workspaceFolder}/backend",
-      "python": "${workspaceFolder}/backend/venv/Scripts/python.exe",
-      "jinja": true
+      "python": "${workspaceFolder}/backend/venv/Scripts/python.exe"
     }
   ],
   "compounds": [
