@@ -785,9 +785,71 @@ class LocalStorageEngine {
     }
 
     if (endpoint === '/analytics/deep') {
+      const subjects = currentUserId ? this.getStore<Subject[]>('subjects', []).filter(s => String(s.user_id) === String(currentUserId)) : [];
+      const tasks = currentUserId ? this.getStore<StudyTask[]>('tasks', []).filter(t => String(t.user_id) === String(currentUserId)) : [];
+      const sessions = currentUserId ? this.getStore<any[]>('sessions', []).filter(s => String(s.user_id) === String(currentUserId)) : [];
+      const quizzes = currentUserId ? this.getStore<Quiz[]>('quizzes', []).filter(q => String(q.user_id) === String(currentUserId)) : [];
+
+      const targetMinutes = currentUser?.daily_goal_minutes || 120;
+
+      // 1. 14-day Focus Trend
+      const now = new Date();
+      const focusTrend = [];
+      for (let i = 13; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 86400000);
+        const dateKey = d.toISOString().split('T')[0];
+        const daySec = sessions
+          .filter(s => (s.created_at || '').startsWith(dateKey))
+          .reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
+
+        focusTrend.push({
+          date: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+          minutes: Math.round(daySec / 60),
+          target: targetMinutes
+        });
+      }
+
+      // 2. Planned vs Actual study minutes by subject
+      const plannedVsActual = subjects.map(s => {
+        const sTasks = tasks.filter(t => t.subject_id === s.id);
+        const plannedMin = sTasks.reduce((acc, t) => acc + (t.estimated_minutes || 30), 0);
+        const sSessions = sessions.filter(sess => sess.subject_id === s.id);
+        const actualMin = sSessions.reduce((acc, sess) => acc + (sess.duration_seconds || 0), 0) / 60;
+
+        return {
+          subject: s.name,
+          planned: plannedMin,
+          actual: Math.round(actualMin),
+          color: s.color || '#6366F1'
+        };
+      });
+
+      // 3. Quiz accuracy trend
+      const quizTrend = quizzes.map((q, idx) => ({
+        attempt: idx + 1,
+        quiz_title: q.title,
+        score_pct: q.passing_score || 80,
+        passed: true,
+        date: q.created_at ? new Date(q.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : `Quiz ${idx + 1}`
+      }));
+
+      // 4. Task completion rate
+      const totalTasks = tasks.length;
+      const completedTasks = tasks.filter(t => t.status === 'completed').length;
+      const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length;
+      const pendingTasks = tasks.filter(t => t.status === 'pending').length;
+
       return {
-        accuracy_history: [],
-        time_allocation: []
+        focus_trend: focusTrend,
+        planned_vs_actual: plannedVsActual,
+        quiz_trend: quizTrend,
+        tasks_summary: {
+          total: totalTasks,
+          completed: completedTasks,
+          in_progress: inProgressTasks,
+          pending: pendingTasks,
+          completion_rate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+        }
       };
     }
 

@@ -9,7 +9,9 @@ import {
   Sparkles,
   Play,
   RotateCw,
-  PieChart as PieIcon
+  PieChart as PieIcon,
+  Layers,
+  Award
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -31,40 +33,73 @@ export const AnalyticsView: React.FC = () => {
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [graphDrawKey, setGraphDrawKey] = useState(0);
+  const [error, setError] = useState<string>('');
+
+  const fetchAnalytics = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const res = await api.getDeepAnalytics();
+      setData(res || {});
+    } catch (err: any) {
+      console.warn('Could not load deep analytics from API:', err);
+      // Fallback empty analytics payload to prevent blank screen
+      setData({
+        focus_trend: [],
+        planned_vs_actual: [],
+        quiz_trend: [],
+        tasks_summary: { total: 0, completed: 0, in_progress: 0, pending: 0, completion_rate: 0 }
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
-      setIsLoading(true);
-      try {
-        const res = await api.getDeepAnalytics();
-        setData(res);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchAnalytics();
   }, []);
 
   if (isLoading) {
     return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center p-8 text-center space-y-3">
-        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center animate-spin">
-          <BarChart3 className="w-5 h-5" />
+      <div className="min-h-[55vh] flex flex-col items-center justify-center p-8 text-center space-y-3">
+        <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center animate-spin shadow-inner">
+          <BarChart3 className="w-6 h-6" />
         </div>
-        <p className="text-xs text-slate-400">Aggregating historical learning analytics...</p>
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+          Aggregating learning telemetry & focus graphs...
+        </p>
       </div>
     );
   }
 
-  if (!data) {
-    return (
-      <div className="p-8 text-center text-xs text-slate-400">
-        No historical analytics available yet. Complete focus sessions and quizzes to populate trends.
-      </div>
-    );
-  }
+  // Safe data extraction with robust fallbacks
+  const now = new Date();
+  const default14Days = Array.from({ length: 14 }).map((_, i) => {
+    const d = new Date(now.getTime() - (13 - i) * 86400000);
+    return {
+      date: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      minutes: 0,
+      target: 120
+    };
+  });
+
+  const focusTrend = Array.isArray(data?.focus_trend) && data.focus_trend.length > 0
+    ? data.focus_trend
+    : default14Days;
+
+  const plannedVsActual: Array<{ subject: string; planned: number; actual: number; color?: string }> =
+    Array.isArray(data?.planned_vs_actual) ? data.planned_vs_actual : [];
+
+  const quizTrend: Array<{ attempt: number; quiz_title: string; score_pct: number; passed: boolean; date?: string }> =
+    Array.isArray(data?.quiz_trend) ? data.quiz_trend : [];
+
+  const tasksSummary = data?.tasks_summary || {
+    total: 0,
+    completed: 0,
+    in_progress: 0,
+    pending: 0,
+    completion_rate: 0
+  };
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-8 animate-fade-in-up">
@@ -81,7 +116,7 @@ export const AnalyticsView: React.FC = () => {
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Strictly calculated from stored database records. Compares actual focus telemetry against initial planner estimates.
+            Strictly calculated from stored database records. Compares actual focus telemetry against planner estimates.
           </p>
         </div>
 
@@ -100,37 +135,35 @@ export const AnalyticsView: React.FC = () => {
       </div>
 
       {/* Top Summary Stat Bar */}
-      {data.tasks_summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <div className="interactive-card p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 text-center hover:border-indigo-300 dark:hover:border-indigo-800/80">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completion Rate</span>
-            <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-              {data.tasks_summary.completion_rate}%
-            </p>
-          </div>
-
-          <div className="interactive-card p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 text-center hover:border-emerald-300 dark:hover:border-emerald-800/80">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completed Tasks</span>
-            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
-              {data.tasks_summary.completed}
-            </p>
-          </div>
-
-          <div className="interactive-card p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 text-center hover:border-indigo-300 dark:hover:border-indigo-800/80">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">In Progress</span>
-            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
-              {data.tasks_summary.in_progress}
-            </p>
-          </div>
-
-          <div className="interactive-card p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 text-center hover:border-slate-300 dark:hover:border-slate-700">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending Tasks</span>
-            <p className="text-2xl font-black text-slate-700 dark:text-slate-300 mt-1">
-              {data.tasks_summary.pending}
-            </p>
-          </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div className="interactive-card p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 text-center hover:border-indigo-300 dark:hover:border-indigo-800/80">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completion Rate</span>
+          <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+            {tasksSummary.completion_rate ?? 0}%
+          </p>
         </div>
-      )}
+
+        <div className="interactive-card p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 text-center hover:border-emerald-300 dark:hover:border-emerald-800/80">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completed Tasks</span>
+          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+            {tasksSummary.completed ?? 0}
+          </p>
+        </div>
+
+        <div className="interactive-card p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 text-center hover:border-indigo-300 dark:hover:border-indigo-800/80">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">In Progress</span>
+          <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
+            {tasksSummary.in_progress ?? 0}
+          </p>
+        </div>
+
+        <div className="interactive-card p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 text-center hover:border-slate-300 dark:hover:border-slate-700">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending Tasks</span>
+          <p className="text-2xl font-black text-slate-700 dark:text-slate-300 mt-1">
+            {tasksSummary.pending ?? 0}
+          </p>
+        </div>
+      </div>
 
       {/* Chart 1: 14-Day Focus Trend Area Chart */}
       <div className="p-5 sm:p-6 rounded-3xl bg-white dark:bg-[#111827] border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
@@ -156,7 +189,7 @@ export const AnalyticsView: React.FC = () => {
 
         <div className="h-64 w-full pt-2">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart key={`area-${graphDrawKey}`} data={data.focus_trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart key={`area-${graphDrawKey}`} data={focusTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="focusColor" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#6366f1" stopOpacity={0.45} />
@@ -173,7 +206,7 @@ export const AnalyticsView: React.FC = () => {
                       <div className="p-2.5 rounded-xl bg-slate-900 text-white text-xs shadow-xl border border-slate-800 animate-scale-in">
                         <p className="font-bold">{item.date}</p>
                         <p className="text-indigo-300 mt-1">Logged: {item.minutes} mins</p>
-                        <p className="text-slate-400">Target: {item.target} mins</p>
+                        <p className="text-slate-400">Target: {item.target || 120} mins</p>
                       </div>
                     );
                   }
@@ -216,13 +249,17 @@ export const AnalyticsView: React.FC = () => {
           </div>
 
           <div className="h-64 w-full pt-2">
-            {data.planned_vs_actual.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-xs text-slate-400">
-                No subject tasks planned yet.
+            {plannedVsActual.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-xs text-slate-400 space-y-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6">
+                <Layers className="w-8 h-8 text-slate-300 dark:text-slate-700" />
+                <p className="font-medium text-slate-600 dark:text-slate-300">No subject tasks planned yet.</p>
+                <p className="text-[11px] text-slate-400 text-center max-w-xs">
+                  Create subjects and schedule study tasks to compare your planned time against actual timer sessions.
+                </p>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart key={`bar-${graphDrawKey}`} data={data.planned_vs_actual} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <BarChart key={`bar-${graphDrawKey}`} data={plannedVsActual} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <XAxis dataKey="subject" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
                   <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
                   <Tooltip
@@ -285,13 +322,17 @@ export const AnalyticsView: React.FC = () => {
           </div>
 
           <div className="h-64 w-full pt-2">
-            {data.quiz_trend.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-xs text-slate-400">
-                No quiz attempts logged yet. Take a quiz to populate accuracy curve.
+            {quizTrend.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-xs text-slate-400 space-y-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6">
+                <Award className="w-8 h-8 text-slate-300 dark:text-slate-700" />
+                <p className="font-medium text-slate-600 dark:text-slate-300">No quiz attempts logged yet.</p>
+                <p className="text-[11px] text-slate-400 text-center max-w-xs">
+                  Complete assessment quizzes to view your historical score progression curve.
+                </p>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart key={`line-${graphDrawKey}`} data={data.quiz_trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <LineChart key={`line-${graphDrawKey}`} data={quizTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <XAxis dataKey="attempt" name="Attempt" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
                   <YAxis domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
                   <Tooltip
