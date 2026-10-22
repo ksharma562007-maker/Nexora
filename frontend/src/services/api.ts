@@ -33,10 +33,17 @@ class ApiService {
       headers['Content-Type'] = 'application/json';
     }
 
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}${endpoint}`, {
+        ...options,
+        headers,
+      });
+    } catch (networkErr: any) {
+      throw new Error(
+        `Unable to reach backend API at ${API_BASE}. Please ensure the backend server is running and accessible.`
+      );
+    }
 
     if (res.status === 401) {
       this.removeToken();
@@ -44,20 +51,33 @@ class ApiService {
       throw new Error('Your session has expired. Please sign in again.');
     }
 
+    const contentType = res.headers.get('content-type') || '';
+
+    // Check if the server returned HTML (happens on Vercel/Netlify when API rewrites return index.html)
+    if (contentType.includes('text/html')) {
+      throw new Error(
+        `Received HTML instead of JSON from API. If deployed on Vercel, configure VITE_API_BASE_URL to your deployed backend URL in Vercel Settings > Environment Variables.`
+      );
+    }
+
     if (!res.ok) {
-      let errorMsg = 'An unexpected error occurred.';
+      let errorMsg = `Server error (${res.status}): ${res.statusText || 'Request failed'}`;
       try {
         const errorData = await res.json();
         if (errorData.detail) {
           errorMsg = typeof errorData.detail === 'string' ? errorData.detail : JSON.stringify(errorData.detail);
         }
       } catch {
-        errorMsg = res.statusText || errorMsg;
+        // Keep the descriptive errorMsg
       }
       throw new Error(errorMsg);
     }
 
-    return res.json();
+    try {
+      return await res.json();
+    } catch (jsonErr: any) {
+      throw new Error(`Failed to parse response as JSON: ${jsonErr.message}`);
+    }
   }
 
   // --- Auth ---

@@ -6,6 +6,7 @@
       "request": "launch",
       "name": "Nexora Smart Learning",
       "url": "http://localhost:8080",
+      "preLaunchTask": "Start Both Services",
       "runtimeArgs": [
         "--app=http://localhost:8080"
       ],
