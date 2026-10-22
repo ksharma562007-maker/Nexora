@@ -12,38 +12,17 @@ import { FlashcardsView } from '../flashcards/FlashcardsView';
 import { NotesView } from '../notes/NotesView';
 import { ExamsView } from '../exams/ExamsView';
 import { AnalyticsView } from '../analytics/AnalyticsView';
-import { api } from '../../services/api';
-import confetti from 'canvas-confetti';
 
 export const AppLayout: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
 
   // Focus timer telemetry link across tabs
   const [runningTimerSec, setRunningTimerSec] = useState<number | null>(null);
   const [timerInitialTaskId, setTimerInitialTaskId] = useState<number | undefined>(undefined);
   const [timerInitialSubjectId, setTimerInitialSubjectId] = useState<number | undefined>(undefined);
-
-  const handleSeedData = async () => {
-    setIsSeeding(true);
-    try {
-      await api.seedDemoData();
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-      // Force reload active view
-      window.location.reload();
-    } catch (err: any) {
-      alert(err.message || 'Failed to seed sample curriculum');
-    } finally {
-      setIsSeeding(false);
-    }
-  };
 
   const handleNavigateToTimerWithTask = (taskId?: number, subjectId?: number) => {
     setTimerInitialTaskId(taskId);
@@ -60,8 +39,6 @@ export const AppLayout: React.FC = () => {
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onSeedData={handleSeedData}
-        isSeeding={isSeeding}
       />
 
       {/* Main Container */}
@@ -82,8 +59,6 @@ export const AppLayout: React.FC = () => {
             {currentTab === 'dashboard' && (
               <DashboardView
                 onNavigate={setCurrentTab}
-                onSeedData={handleSeedData}
-                isSeeding={isSeeding}
               />
             )}
 

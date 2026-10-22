@@ -33,8 +33,8 @@ interface SidebarProps {
   isOpenMobile: boolean;
   onCloseMobile: () => void;
   onOpenSettings: () => void;
-  onSeedData: () => void;
-  isSeeding: boolean;
+  onSeedData?: () => void;
+  isSeeding?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -132,28 +132,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             );
           })}
-
-          {/* Quick Demo Seeder Banner */}
-          <div className="pt-4">
-            <div className="p-3.5 rounded-xl bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-950/40 dark:to-violet-950/30 border border-indigo-100/80 dark:border-indigo-800/40">
-              <div className="flex items-center gap-2 mb-1.5">
-                <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  Interactive Demo
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-                Load sample academic curriculum with quizzes, flashcards, and notes.
-              </p>
-              <button
-                onClick={onSeedData}
-                disabled={isSeeding}
-                className="w-full py-1.5 px-3 rounded-lg text-xs font-semibold bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700/60 hover:bg-indigo-50 dark:hover:bg-slate-700/70 shadow-sm transition-colors flex items-center justify-center gap-1.5"
-              >
-                {isSeeding ? 'Seeding Data...' : 'Seed Sample Data'}
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* User Profile Footer */}

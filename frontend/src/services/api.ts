@@ -12,6 +12,60 @@ const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || '/api';
 // New users start with 100% clean, empty records (no default fake data).
 // ==============================================================================
 class LocalStorageEngine {
+  constructor() {
+    this.cleanLegacyDemoData();
+  }
+
+  // Purge any legacy demo mock data from earlier sessions so it never leaks into new accounts
+  private cleanLegacyDemoData() {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+
+      if (localStorage.getItem('nexora_seeded')) {
+        localStorage.removeItem('nexora_seeded');
+      }
+
+      // Purge old mock seeded subjects (e.g. user_id: 1 from static seeder)
+      const subjects = this.getStore<any[]>('subjects', []);
+      const legacySubjectNames = [
+        'Data Structures & Algorithms',
+        'Machine Learning & Deep Learning',
+        'Operating Systems & Architecture',
+        'Computer Science & Engineering',
+        'Discrete Mathematics'
+      ];
+      const cleanedSubjects = subjects.filter(s => {
+        if (!s.user_id || s.user_id === 1) {
+          if (legacySubjectNames.includes(s.name)) return false;
+        }
+        return true;
+      });
+      if (cleanedSubjects.length !== subjects.length) {
+        this.setStore('subjects', cleanedSubjects);
+      }
+
+      // Purge old mock notes
+      const notes = this.getStore<any[]>('notes', []);
+      const legacyNoteTitles = [
+        'Algorithms & Asymptotic Complexity',
+        'Supervised Learning Fundamentals',
+        'Binary Search Trees and Balanced AVL Trees',
+        'Self-Attention and the Transformer Architecture'
+      ];
+      const cleanedNotes = notes.filter(n => {
+        if (!n.user_id || n.user_id === 1) {
+          if (legacyNoteTitles.includes(n.title)) return false;
+        }
+        return true;
+      });
+      if (cleanedNotes.length !== notes.length) {
+        this.setStore('notes', cleanedNotes);
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
   private getStore<T = any>(key: string, defaultVal: T = [] as any): T {
     try {
       const val = localStorage.getItem(`nexora_${key}`);
@@ -32,7 +86,20 @@ class LocalStorageEngine {
   private getCurrentUser(): User | null {
     try {
       const u = localStorage.getItem('nexora_current_user');
-      return u ? JSON.parse(u) : null;
+      if (u) {
+        return JSON.parse(u);
+      }
+      const token = localStorage.getItem('nexora_token');
+      if (token && token.startsWith('token_')) {
+        const idStr = token.replace('token_', '');
+        const users = this.getStore<any[]>('users', []);
+        const found = users.find(usr => String(usr.id) === String(idStr));
+        if (found) {
+          localStorage.setItem('nexora_current_user', JSON.stringify(found));
+          return found;
+        }
+      }
+      return null;
     } catch {
       return null;
     }
@@ -50,7 +117,7 @@ class LocalStorageEngine {
     }
 
     const currentUser = this.getCurrentUser();
-    const currentUserId = currentUser ? currentUser.id : 1;
+    const currentUserId = currentUser ? currentUser.id : null;
 
     // --- Auth Endpoints ---
     if (endpoint === '/auth/register' && method === 'POST') {
@@ -59,9 +126,11 @@ class LocalStorageEngine {
       const username = (body.username || email.split('@')[0]).trim();
       const password = body.password || '';
 
-      const existing = users.find(u => u.email === email || u.username === username);
+      const existing = users.find(
+        u => (u.email && u.email.toLowerCase() === email) || (u.username && u.username.toLowerCase() === username.toLowerCase())
+      );
       if (existing) {
-        throw new Error('A user with this email or username already exists.');
+        throw new Error('An account with this email or username already exists. Please sign in instead.');
       }
 
       const newUser: User = {
@@ -77,10 +146,11 @@ class LocalStorageEngine {
         created_at: new Date().toISOString()
       };
 
-      // Store user with credentials
+      // Store new user with credentials
       users.push({ ...newUser, password });
       this.setStore('users', users);
       localStorage.setItem('nexora_current_user', JSON.stringify(newUser));
+      localStorage.setItem('nexora_token', `token_${newUser.id}`);
 
       return {
         access_token: `token_${newUser.id}`,
@@ -95,11 +165,11 @@ class LocalStorageEngine {
       const password = body.password || '';
 
       const userRecord = users.find(
-        u => u.email?.toLowerCase() === identifier || u.username?.toLowerCase() === identifier
+        u => (u.email && u.email.toLowerCase() === identifier) || (u.username && u.username.toLowerCase() === identifier)
       );
 
       if (!userRecord) {
-        throw new Error('Invalid credentials. User not found. Please register.');
+        throw new Error('No account found with this email or username. Please check your credentials or sign up.');
       }
 
       if (userRecord.password && password && userRecord.password !== password) {
@@ -120,6 +190,8 @@ class LocalStorageEngine {
       };
 
       localStorage.setItem('nexora_current_user', JSON.stringify(userOut));
+      localStorage.setItem('nexora_token', `token_${userOut.id}`);
+
       return {
         access_token: `token_${userOut.id}`,
         token_type: 'bearer',
@@ -128,20 +200,17 @@ class LocalStorageEngine {
     }
 
     if (endpoint === '/auth/me') {
-      if (currentUser) {
-        return currentUser;
-      }
-      const users = this.getStore<User[]>('users', []);
-      if (users.length > 0) {
-        localStorage.setItem('nexora_current_user', JSON.stringify(users[0]));
-        return users[0];
+      const active = this.getCurrentUser();
+      if (active) {
+        return active;
       }
       throw new Error('No user signed in');
     }
 
     if (endpoint === '/auth/profile' && method === 'PUT') {
+      if (!currentUserId) throw new Error('Unauthorized');
       const users = this.getStore<any[]>('users', []);
-      const idx = users.findIndex(u => u.id === currentUserId);
+      const idx = users.findIndex(u => String(u.id) === String(currentUserId));
       if (idx !== -1) {
         Object.assign(users[idx], body);
         this.setStore('users', users);
@@ -153,10 +222,12 @@ class LocalStorageEngine {
 
     // --- Subjects & Topics (Filtered strictly by user_id) ---
     if (endpoint === '/subjects' && method === 'GET') {
+      if (!currentUserId) return [];
       const subjects = this.getStore<Subject[]>('subjects', []);
-      return subjects.filter(s => s.user_id === currentUserId);
+      return subjects.filter(s => String(s.user_id) === String(currentUserId));
     }
     if (endpoint === '/subjects' && method === 'POST') {
+      if (!currentUserId) throw new Error('You must be logged in to create a subject.');
       const subjects = this.getStore<Subject[]>('subjects', []);
       const newSubject: Subject = {
         id: Date.now(),
@@ -177,17 +248,19 @@ class LocalStorageEngine {
       return newSubject;
     }
     if (endpoint.startsWith('/subjects/') && !endpoint.includes('topics') && method === 'GET') {
+      if (!currentUserId) throw new Error('Subject not found');
       const id = parseInt(endpoint.split('/')[2]);
-      const subjects = this.getStore<Subject[]>('subjects', []).filter(s => s.user_id === currentUserId);
+      const subjects = this.getStore<Subject[]>('subjects', []).filter(s => String(s.user_id) === String(currentUserId));
       const subject = subjects.find(s => s.id === id);
       if (!subject) throw new Error('Subject not found');
       const topics = this.getStore<Topic[]>('topics', []).filter(t => t.subject_id === id);
       return { ...subject, topics };
     }
     if (endpoint.startsWith('/subjects/') && !endpoint.includes('topics') && method === 'PUT') {
+      if (!currentUserId) throw new Error('Subject not found');
       const id = parseInt(endpoint.split('/')[2]);
       const subjects = this.getStore<Subject[]>('subjects', []);
-      const idx = subjects.findIndex(s => s.id === id && s.user_id === currentUserId);
+      const idx = subjects.findIndex(s => s.id === id && String(s.user_id) === String(currentUserId));
       if (idx !== -1) {
         Object.assign(subjects[idx], body, { updated_at: new Date().toISOString() });
         this.setStore('subjects', subjects);
@@ -196,8 +269,9 @@ class LocalStorageEngine {
       throw new Error('Subject not found');
     }
     if (endpoint.startsWith('/subjects/') && !endpoint.includes('topics') && method === 'DELETE') {
+      if (!currentUserId) throw new Error('Subject not found');
       const id = parseInt(endpoint.split('/')[2]);
-      const subjects = this.getStore<Subject[]>('subjects', []).filter(s => !(s.id === id && s.user_id === currentUserId));
+      const subjects = this.getStore<Subject[]>('subjects', []).filter(s => !(s.id === id && String(s.user_id) === String(currentUserId)));
       this.setStore('subjects', subjects);
       return { message: 'Subject deleted successfully' };
     }
@@ -221,7 +295,7 @@ class LocalStorageEngine {
 
       // Increment subject topic_count
       const subjects = this.getStore<Subject[]>('subjects', []);
-      const s = subjects.find(sub => sub.id === body.subject_id && sub.user_id === currentUserId);
+      const s = subjects.find(sub => sub.id === body.subject_id && String(sub.user_id) === String(currentUserId));
       if (s) {
         s.topic_count = (s.topic_count || 0) + 1;
         this.setStore('subjects', subjects);
@@ -248,10 +322,11 @@ class LocalStorageEngine {
 
     // --- Planner Tasks (Filtered strictly by user_id) ---
     if (endpoint.startsWith('/planner/tasks') && method === 'GET') {
-      const tasks = this.getStore<StudyTask[]>('tasks', []).filter(t => t.user_id === currentUserId);
-      return tasks;
+      if (!currentUserId) return [];
+      return this.getStore<StudyTask[]>('tasks', []).filter(t => String(t.user_id) === String(currentUserId));
     }
     if (endpoint === '/planner/tasks' && method === 'POST') {
+      if (!currentUserId) throw new Error('Unauthorized');
       const tasks = this.getStore<StudyTask[]>('tasks', []);
       const newTask: StudyTask = {
         id: Date.now(),
@@ -271,9 +346,10 @@ class LocalStorageEngine {
       return newTask;
     }
     if (endpoint.startsWith('/planner/tasks/') && method === 'PUT') {
+      if (!currentUserId) throw new Error('Task not found');
       const id = parseInt(endpoint.split('/').pop() || '0');
       const tasks = this.getStore<StudyTask[]>('tasks', []);
-      const idx = tasks.findIndex(t => t.id === id && t.user_id === currentUserId);
+      const idx = tasks.findIndex(t => t.id === id && String(t.user_id) === String(currentUserId));
       if (idx !== -1) {
         Object.assign(tasks[idx], body);
         this.setStore('tasks', tasks);
@@ -282,13 +358,15 @@ class LocalStorageEngine {
       throw new Error('Task not found');
     }
     if (endpoint.startsWith('/planner/tasks/') && method === 'DELETE') {
+      if (!currentUserId) throw new Error('Task not found');
       const id = parseInt(endpoint.split('/').pop() || '0');
-      const tasks = this.getStore<StudyTask[]>('tasks', []).filter(t => !(t.id === id && t.user_id === currentUserId));
+      const tasks = this.getStore<StudyTask[]>('tasks', []).filter(t => !(t.id === id && String(t.user_id) === String(currentUserId)));
       this.setStore('tasks', tasks);
       return { message: 'Task deleted' };
     }
     if (endpoint === '/planner/recommendations') {
-      const tasks = this.getStore<StudyTask[]>('tasks', []).filter(t => t.user_id === currentUserId && t.status !== 'completed');
+      if (!currentUserId) return { recommended_tasks: [], conflicts: [], daily_load: {}, daily_capacity_minutes: 120 };
+      const tasks = this.getStore<StudyTask[]>('tasks', []).filter(t => String(t.user_id) === String(currentUserId) && t.status !== 'completed');
       return {
         recommended_tasks: tasks.slice(0, 3).map(t => ({
           task: t,
@@ -304,6 +382,7 @@ class LocalStorageEngine {
 
     // --- Focus Timer (Filtered strictly by user_id) ---
     if (endpoint === '/timer/sessions' && method === 'POST') {
+      if (!currentUserId) throw new Error('Unauthorized');
       const sessions = this.getStore<any[]>('sessions', []);
       const newSession = {
         id: Date.now(),
@@ -316,10 +395,27 @@ class LocalStorageEngine {
       return newSession;
     }
     if (endpoint === '/timer/stats') {
-      const sessions = this.getStore<any[]>('sessions', []).filter(s => s.user_id === currentUserId);
+      if (!currentUserId) {
+        return {
+          today_minutes: 0,
+          weekly_minutes: 0,
+          total_hours: 0,
+          total_sessions: 0,
+          recent_sessions: [],
+          daily_goal_minutes: 120,
+          pomodoro_focus_min: 25,
+          pomodoro_break_min: 5
+        };
+      }
+      const sessions = this.getStore<any[]>('sessions', []).filter(s => String(s.user_id) === String(currentUserId));
+      const todayKey = new Date().toISOString().split('T')[0];
+      const todaySec = sessions
+        .filter(s => (s.created_at || '').startsWith(todayKey))
+        .reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
       const totalSec = sessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
+
       return {
-        today_minutes: Math.round(totalSec / 60),
+        today_minutes: Math.round(todaySec / 60),
         weekly_minutes: Math.round(totalSec / 60),
         total_hours: +(totalSec / 3600).toFixed(1),
         total_sessions: sessions.length,
@@ -332,9 +428,11 @@ class LocalStorageEngine {
 
     // --- Quizzes (Filtered strictly by user_id) ---
     if (endpoint === '/quizzes' && method === 'GET') {
-      return this.getStore<Quiz[]>('quizzes', []).filter(q => q.user_id === currentUserId);
+      if (!currentUserId) return [];
+      return this.getStore<Quiz[]>('quizzes', []).filter(q => String(q.user_id) === String(currentUserId));
     }
     if (endpoint === '/quizzes' && method === 'POST') {
+      if (!currentUserId) throw new Error('Unauthorized');
       const quizzes = this.getStore<Quiz[]>('quizzes', []);
       const newQuiz: Quiz = {
         id: Date.now(),
@@ -355,14 +453,14 @@ class LocalStorageEngine {
     }
     if (endpoint.startsWith('/quizzes/') && !endpoint.includes('submit') && !endpoint.includes('attempts') && method === 'GET') {
       const id = parseInt(endpoint.split('/')[2]);
-      const quizzes = this.getStore<Quiz[]>('quizzes', []).filter(q => q.user_id === currentUserId);
+      const quizzes = this.getStore<Quiz[]>('quizzes', []).filter(q => String(q.user_id) === String(currentUserId));
       const quiz = quizzes.find(q => q.id === id);
       if (!quiz) throw new Error('Quiz not found');
       return quiz;
     }
     if (endpoint.includes('/submit') && method === 'POST') {
       const id = parseInt(endpoint.split('/')[2]);
-      const quizzes = this.getStore<Quiz[]>('quizzes', []).filter(q => q.user_id === currentUserId);
+      const quizzes = this.getStore<Quiz[]>('quizzes', []).filter(q => String(q.user_id) === String(currentUserId));
       const quiz = quizzes.find(q => q.id === id);
       const questions = quiz?.questions || [];
       const answers = body.answers || {};
@@ -403,9 +501,11 @@ class LocalStorageEngine {
 
     // --- Flashcards (Filtered strictly by user_id) ---
     if (endpoint === '/flashcards/decks' && method === 'GET') {
-      return this.getStore<FlashcardDeck[]>('decks', []).filter(d => d.user_id === currentUserId);
+      if (!currentUserId) return [];
+      return this.getStore<FlashcardDeck[]>('decks', []).filter(d => String(d.user_id) === String(currentUserId));
     }
     if (endpoint === '/flashcards/decks' && method === 'POST') {
+      if (!currentUserId) throw new Error('Unauthorized');
       const decks = this.getStore<FlashcardDeck[]>('decks', []);
       const newDeck: FlashcardDeck = {
         id: Date.now(),
@@ -426,18 +526,20 @@ class LocalStorageEngine {
     }
     if (endpoint.startsWith('/flashcards/decks/') && endpoint.endsWith('/cards')) {
       const deckId = parseInt(endpoint.split('/')[3]);
-      return this.getStore<Flashcard[]>('cards', []).filter(c => c.deck_id === deckId && c.user_id === currentUserId);
+      return this.getStore<Flashcard[]>('cards', []).filter(c => c.deck_id === deckId && String(c.user_id) === String(currentUserId));
     }
     if (endpoint.startsWith('/flashcards/decks/') && method === 'GET') {
       const deckId = parseInt(endpoint.split('/')[3]);
-      const deck = this.getStore<FlashcardDeck[]>('decks', []).find(d => d.id === deckId && d.user_id === currentUserId);
+      const deck = this.getStore<FlashcardDeck[]>('decks', []).find(d => d.id === deckId && String(d.user_id) === String(currentUserId));
       if (!deck) throw new Error('Deck not found');
       return deck;
     }
     if (endpoint.startsWith('/flashcards/due')) {
-      return this.getStore<Flashcard[]>('cards', []).filter(c => c.user_id === currentUserId);
+      if (!currentUserId) return [];
+      return this.getStore<Flashcard[]>('cards', []).filter(c => String(c.user_id) === String(currentUserId));
     }
     if (endpoint === '/flashcards/cards' && method === 'POST') {
+      if (!currentUserId) throw new Error('Unauthorized');
       const cards = this.getStore<Flashcard[]>('cards', []);
       const newCard: Flashcard = {
         id: Date.now(),
@@ -457,7 +559,7 @@ class LocalStorageEngine {
 
       // Increment deck total_cards
       const decks = this.getStore<FlashcardDeck[]>('decks', []);
-      const d = decks.find(deck => deck.id === body.deck_id && deck.user_id === currentUserId);
+      const d = decks.find(deck => deck.id === body.deck_id && String(deck.user_id) === String(currentUserId));
       if (d) {
         d.total_cards = (d.total_cards || 0) + 1;
         d.due_cards = (d.due_cards || 0) + 1;
@@ -468,7 +570,7 @@ class LocalStorageEngine {
     if (endpoint.includes('/review') && method === 'POST') {
       const cardId = parseInt(endpoint.split('/')[3]);
       const cards = this.getStore<Flashcard[]>('cards', []);
-      const card = cards.find(c => c.id === cardId && c.user_id === currentUserId);
+      const card = cards.find(c => c.id === cardId && String(c.user_id) === String(currentUserId));
       if (card) {
         card.repetition = (card.repetition || 0) + 1;
         card.interval_days = Math.round((card.interval_days || 1) * (card.ease_factor || 2.5));
@@ -480,9 +582,19 @@ class LocalStorageEngine {
 
     // --- Notes & PDF Assistant (Filtered strictly by user_id) ---
     if (endpoint.startsWith('/notes') && method === 'GET') {
-      return this.getStore<Note[]>('notes', []).filter(n => n.user_id === currentUserId);
+      if (!currentUserId) return [];
+      const notes = this.getStore<Note[]>('notes', []).filter(n => String(n.user_id) === String(currentUserId));
+      const subjects = this.getStore<Subject[]>('subjects', []).filter(s => String(s.user_id) === String(currentUserId));
+      return notes.map(n => {
+        const s = subjects.find(sub => sub.id === n.subject_id);
+        return {
+          ...n,
+          subject_name: s ? s.name : 'General'
+        };
+      });
     }
     if (endpoint === '/notes' && method === 'POST') {
+      if (!currentUserId) throw new Error('Unauthorized');
       const notes = this.getStore<Note[]>('notes', []);
       const newNote: Note = {
         id: Date.now(),
@@ -501,19 +613,19 @@ class LocalStorageEngine {
     }
     if (endpoint.startsWith('/notes/') && !endpoint.includes('summarize') && !endpoint.includes('ask') && method === 'GET') {
       const id = parseInt(endpoint.split('/')[2]);
-      const note = this.getStore<Note[]>('notes', []).find(n => n.id === id && n.user_id === currentUserId);
+      const note = this.getStore<Note[]>('notes', []).find(n => n.id === id && String(n.user_id) === String(currentUserId));
       if (!note) throw new Error('Note not found');
       return note;
     }
     if (endpoint.startsWith('/notes/') && method === 'DELETE') {
       const id = parseInt(endpoint.split('/')[2]);
-      const notes = this.getStore<Note[]>('notes', []).filter(n => !(n.id === id && n.user_id === currentUserId));
+      const notes = this.getStore<Note[]>('notes', []).filter(n => !(n.id === id && String(n.user_id) === String(currentUserId)));
       this.setStore('notes', notes);
       return { message: 'Note deleted' };
     }
     if (endpoint.startsWith('/notes/') && endpoint.includes('/summarize') && method === 'POST') {
       return {
-        summary: 'Extractive summary of your note.',
+        summary: 'Extractive summary of your study note.',
         key_points: ['Summary extracted from note text.'],
         word_count: 40,
         estimated_read_minutes: 1
@@ -529,9 +641,11 @@ class LocalStorageEngine {
 
     // --- Exams & Goals (Filtered strictly by user_id) ---
     if (endpoint === '/exams' && method === 'GET') {
-      return this.getStore<Exam[]>('exams', []).filter(e => e.user_id === currentUserId);
+      if (!currentUserId) return [];
+      return this.getStore<Exam[]>('exams', []).filter(e => String(e.user_id) === String(currentUserId));
     }
     if (endpoint === '/exams' && method === 'POST') {
+      if (!currentUserId) throw new Error('Unauthorized');
       const exams = this.getStore<Exam[]>('exams', []);
       const newExam: Exam = {
         id: Date.now(),
@@ -551,15 +665,17 @@ class LocalStorageEngine {
     }
     if (endpoint.startsWith('/exams/') && method === 'DELETE') {
       const id = parseInt(endpoint.split('/').pop() || '0');
-      const exams = this.getStore<Exam[]>('exams', []).filter(e => !(e.id === id && e.user_id === currentUserId));
+      const exams = this.getStore<Exam[]>('exams', []).filter(e => !(e.id === id && String(e.user_id) === String(currentUserId)));
       this.setStore('exams', exams);
       return { message: 'Exam deleted' };
     }
 
     if (endpoint === '/goals' && method === 'GET') {
-      return this.getStore<Goal[]>('goals', []).filter(g => g.user_id === currentUserId);
+      if (!currentUserId) return [];
+      return this.getStore<Goal[]>('goals', []).filter(g => String(g.user_id) === String(currentUserId));
     }
     if (endpoint === '/goals' && method === 'POST') {
+      if (!currentUserId) throw new Error('Unauthorized');
       const goals = this.getStore<Goal[]>('goals', []);
       const newGoal: Goal = {
         id: Date.now(),
@@ -579,49 +695,89 @@ class LocalStorageEngine {
     }
     if (endpoint.startsWith('/goals/') && method === 'DELETE') {
       const id = parseInt(endpoint.split('/').pop() || '0');
-      const goals = this.getStore<Goal[]>('goals', []).filter(g => !(g.id === id && g.user_id === currentUserId));
+      const goals = this.getStore<Goal[]>('goals', []).filter(g => !(g.id === id && String(g.user_id) === String(currentUserId)));
       this.setStore('goals', goals);
       return { message: 'Goal deleted' };
     }
 
     // --- Dashboard Telemetry (Strictly Per-User) ---
     if (endpoint === '/analytics/dashboard') {
-      const subjects = this.getStore<Subject[]>('subjects', []).filter(s => s.user_id === currentUserId);
-      const tasks = this.getStore<StudyTask[]>('tasks', []).filter(t => t.user_id === currentUserId);
-      const cards = this.getStore<Flashcard[]>('cards', []).filter(c => c.user_id === currentUserId);
-      const exams = this.getStore<Exam[]>('exams', []).filter(e => e.user_id === currentUserId);
-      const sessions = this.getStore<any[]>('sessions', []).filter(s => s.user_id === currentUserId);
+      if (!currentUserId) {
+        return {
+          user_name: 'Learner',
+          today_focus_minutes: 0,
+          daily_goal_minutes: 120,
+          active_streak_days: 0,
+          total_study_hours: 0,
+          pending_tasks_count: 0,
+          due_flashcards_count: 0,
+          upcoming_exams_count: 0,
+          mastery_average: 0,
+          weekly_focus: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({ day, date: day, minutes: 0 })),
+          subject_mastery: [],
+          weak_topics: [],
+          recommendations: [],
+          has_activity: false
+        };
+      }
 
-      // Check if this specific user has ANY activity or added items
-      const hasActivity = subjects.length > 0 || tasks.length > 0 || sessions.length > 0 || cards.length > 0 || exams.length > 0;
+      const subjects = this.getStore<Subject[]>('subjects', []).filter(s => String(s.user_id) === String(currentUserId));
+      const tasks = this.getStore<StudyTask[]>('tasks', []).filter(t => String(t.user_id) === String(currentUserId));
+      const cards = this.getStore<Flashcard[]>('cards', []).filter(c => String(c.user_id) === String(currentUserId));
+      const exams = this.getStore<Exam[]>('exams', []).filter(e => String(e.user_id) === String(currentUserId));
+      const sessions = this.getStore<any[]>('sessions', []).filter(s => String(s.user_id) === String(currentUserId));
 
       const totalSec = sessions.reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
-      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      const weeklyFocus = dayNames.map((day, idx) => ({
-        day,
-        date: `Day ${idx + 1}`,
-        minutes: 0
-      }));
+
+      // Dynamically calculate past 7 days study minutes from real recorded sessions
+      const now = new Date();
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const weeklyFocus = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 86400000);
+        const dayStr = dayNames[d.getDay()];
+        const dateKey = d.toISOString().split('T')[0];
+        const daySec = sessions
+          .filter(s => (s.created_at || '').startsWith(dateKey))
+          .reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
+
+        weeklyFocus.push({
+          day: dayStr,
+          date: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+          minutes: Math.round(daySec / 60)
+        });
+      }
+
+      const todayDateKey = now.toISOString().split('T')[0];
+      const todaySec = sessions
+        .filter(s => (s.created_at || '').startsWith(todayDateKey))
+        .reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
+
+      const hasActivity = subjects.length > 0 || tasks.length > 0 || sessions.length > 0 || cards.length > 0 || exams.length > 0;
 
       return {
-        user_name: currentUser?.full_name || 'Learner',
-        today_focus_minutes: Math.round(totalSec / 60),
+        user_name: currentUser?.full_name || currentUser?.username || 'Learner',
+        today_focus_minutes: Math.round(todaySec / 60),
         daily_goal_minutes: currentUser?.daily_goal_minutes || 120,
-        active_streak_days: hasActivity ? 1 : 0,
+        active_streak_days: sessions.length > 0 || tasks.some(t => t.status === 'completed') ? 1 : 0,
         total_study_hours: +(totalSec / 3600).toFixed(1),
         pending_tasks_count: tasks.filter(t => t.status !== 'completed').length,
         due_flashcards_count: cards.length,
         upcoming_exams_count: exams.length,
         mastery_average: subjects.length > 0 ? Math.round(subjects.reduce((a, s) => a + (s.mastery_percentage || 0), 0) / subjects.length) : 0,
         weekly_focus: weeklyFocus,
-        subject_mastery: subjects.map(s => ({
-          id: s.id,
-          name: s.name,
-          color: s.color,
-          mastery_percentage: s.mastery_percentage || 0,
-          topics_count: s.topic_count || 0,
-          study_minutes: 0
-        })),
+        subject_mastery: subjects.map(s => {
+          const sSessions = sessions.filter(sess => sess.subject_id === s.id);
+          const sSec = sSessions.reduce((acc, sess) => acc + (sess.duration_seconds || 0), 0);
+          return {
+            id: s.id,
+            name: s.name,
+            color: s.color,
+            mastery_percentage: s.mastery_percentage || 0,
+            topics_count: s.topic_count || 0,
+            study_minutes: Math.round(sSec / 60)
+          };
+        }),
         weak_topics: [],
         recommendations: [],
         has_activity: hasActivity

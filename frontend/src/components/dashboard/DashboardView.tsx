@@ -13,7 +13,8 @@ import {
   Calendar,
   Layers,
   ChevronRight,
-  Play
+  Play,
+  Plus
 } from 'lucide-react';
 import {
   BarChart,
@@ -30,8 +31,8 @@ import { NavTab } from '../layout/Sidebar';
 
 interface DashboardViewProps {
   onNavigate: (tab: NavTab) => void;
-  onSeedData: () => void;
-  isSeeding: boolean;
+  onSeedData?: () => void;
+  isSeeding?: boolean;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -83,71 +84,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         >
           Retry
         </button>
-      </div>
-    );
-  }
-
-  // Section 5 Requirement: "For new users, show a helpful onboarding screen instead of fake progress statistics."
-  if (!data.has_activity) {
-    return (
-      <div className="p-6 sm:p-10 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-300">
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Welcome to Nexora</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Hello, {data.user_name}! Let's build your study plan.
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 max-w-lg mx-auto">
-            You don't have any subjects or study history yet. Choose how you'd like to get started:
-          </p>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 flex flex-col justify-between">
-            <div className="space-y-2">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Load Interactive Demo Curriculum
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                Immediately populate realistic computer science subjects, dynamic programming quizzes, machine learning flashcards, notes, and exams to explore all platform features.
-              </p>
-            </div>
-            <button
-              onClick={onSeedData}
-              disabled={isSeeding}
-              className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md transition-colors flex items-center justify-center gap-2"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{isSeeding ? 'Loading Sample Curriculum...' : 'Load Sample Curriculum'}</span>
-            </button>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 flex flex-col justify-between">
-            <div className="space-y-2">
-              <div className="w-10 h-10 rounded-xl bg-violet-50 dark:bg-violet-950 text-violet-600 dark:text-violet-400 flex items-center justify-center">
-                <Layers className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Create Your Own Subjects
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                Start clean with your actual course syllabus. Create subjects, add topics, configure your target study hours, and upload your lecture notes or PDFs.
-              </p>
-            </div>
-            <button
-              onClick={() => onNavigate('subjects')}
-              className="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold text-xs transition-colors flex items-center justify-center gap-2"
-            >
-              <span>Add First Subject</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
       </div>
     );
   }
@@ -399,9 +335,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <div className="space-y-3">
             {data.recommendations.length === 0 ? (
-              <p className="text-xs text-slate-400 py-6 text-center">
-                All caught up! No critical pending items right now.
-              </p>
+              <div className="p-5 text-center rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
+                <Sparkles className="w-6 h-6 text-indigo-500 mx-auto" />
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Ready to Start Studying
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Start a focus timer session or add notes to receive personalized study recommendations.
+                </p>
+                <button
+                  onClick={() => onNavigate('timer')}
+                  className="mt-1 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm transition-colors"
+                >
+                  <Play className="w-3.5 h-3.5 fill-white" />
+                  <span>Start Focus Timer</span>
+                </button>
+              </div>
             ) : (
               data.recommendations.map((rec, idx) => (
                 <div
@@ -461,40 +410,59 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="space-y-3">
-            {data.subject_mastery.map(subj => (
-              <div
-                key={subj.id}
-                className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-2"
-              >
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: subj.color || '#6366F1' }}
-                    />
-                    <span className="font-bold text-slate-800 dark:text-slate-200">
-                      {subj.name}
-                    </span>
-                    <span className="text-slate-400 text-[11px]">
-                      ({subj.topics_count} topics)
+            {data.subject_mastery.length === 0 ? (
+              <div className="p-6 text-center rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
+                <BookOpen className="w-7 h-7 text-indigo-400 mx-auto" />
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  No subjects added yet
+                </p>
+                <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                  Add your courses to track curriculum topics, study hours, and mastery levels.
+                </p>
+                <button
+                  onClick={() => onNavigate('subjects')}
+                  className="mt-1 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add First Subject</span>
+                </button>
+              </div>
+            ) : (
+              data.subject_mastery.map(subj => (
+                <div
+                  key={subj.id}
+                  className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-2"
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: subj.color || '#6366F1' }}
+                      />
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
+                        {subj.name}
+                      </span>
+                      <span className="text-slate-400 text-[11px]">
+                        ({subj.topics_count} topics)
+                      </span>
+                    </div>
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      {subj.mastery_percentage}%
                     </span>
                   </div>
-                  <span className="font-bold text-slate-900 dark:text-white">
-                    {subj.mastery_percentage}%
-                  </span>
-                </div>
 
-                <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${subj.mastery_percentage}%`,
-                      backgroundColor: subj.color || '#6366F1'
-                    }}
-                  />
+                  <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${subj.mastery_percentage}%`,
+                        backgroundColor: subj.color || '#6366F1'
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
